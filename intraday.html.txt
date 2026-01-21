@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Intraday Scanner</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<h1>Intraday Scanner</h1>
+<textarea id="strategyBox" placeholder="Type Your Strategy ..."></textarea>
+<br><br>
+<span class="tag">5 Min Performance</span>
+<span class="tag">15 Min Performance</span>
+<script src="js/app.js"></script>
+</body>
+</html>

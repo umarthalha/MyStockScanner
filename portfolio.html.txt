@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Portfolio Manager</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="sidebar" class="sidebar">
+<h2>Stock Scanner</h2>
+<a href="index.html">Home</a>
+<a href="intraday.html">Intraday Scanner</a>
+<a href="stock.html">Stock Scanner</a>
+<a href="backtest.html">Backtest</a>
+<a href="portfolio.html">Portfolio Manager</a>
+</div>
+
+<div class="topbar">
+<button class="menu-btn" onclick="toggleSidebar()">☰</button>
+</div>
+
+<div class="content">
+<h1>Paper Trade Portfolio</h1>
+
+<table>
+<tr><th>Stock</th><th>Qty</th><th>Avg</th><th>P&L</th></tr>
+<tr><td>HINDALCO</td><td>5</td><td>933</td><td>0</td></tr>
+<tr><td>TATASTEEL</td><td>26</td><td>187.75</td><td>0</td></tr>
+</table>
+
+<p class="disclaimer">Virtual money only.</p>
+</div>
+
+<script src="js/app.js"></script>
+</body>
+</html>

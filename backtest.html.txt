@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Backtest</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<h1>Backtest (Educational)</h1>
+
+<p>Define your strategy and test on past data (demo).</p>
+
+<input placeholder="Strategy Name"><br><br>
+<input placeholder="Starting Capital"><br><br>
+
+<textarea id="strategyBox" placeholder="Type Your Strategy ..."></textarea>
+<br><br>
+
+<span class="tag">1 Month Performance</span>
+<span class="tag">6 Month Performance</span>
+<span class="tag">1 Year Performance</span>
+
+<br><br>
+<button onclick="runBacktest()">Try Backtest</button>
+
+<div id="result"></div>
+
+<script src="js/app.js"></script>
+<script>
+function runBacktest(){
+document.getElementById("result").innerHTML =
+"<h3>Backtest Result</h3><p>Total Return: +12%</p><p>Drawdown: -4%</p>";
+}
+</script>
+
+</body>
+</html>
