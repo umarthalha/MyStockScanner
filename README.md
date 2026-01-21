@@ -28,3 +28,4 @@ Portfolio Manager
 
 All features are rule-based, user-controlled, and built only for learning and practice.
 No investment advice, no buy/sell recommendations, and no real-money trading.
+start
