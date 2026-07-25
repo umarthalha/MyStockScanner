@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AI Khan — Stock Signal Dashboard</title>
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --card: #111827;
+    --card2: #1a2235;
+    --border: #1e2d45;
+    --accent: #3b82f6;
+    --green: #10b981;
+    --red: #ef4444;
+    --yellow: #f59e0b;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --white: #ffffff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+
+  /* ── HEADER ── */
+  header {
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 60px; position: sticky; top: 0; z-index: 100;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-icon {
+    width: 36px; height: 36px; border-radius: 8px;
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 900; font-size: 18px; color: #fff;
+  }
+  .logo-text { font-size: 20px; font-weight: 700; color: var(--white); letter-spacing: -0.5px; }
+  .logo-sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .header-right { display: flex; align-items: center; gap: 14px; }
+  #lastUpdate { font-size: 12px; color: var(--muted); }
+  .btn {
+    background: var(--accent); color: #fff; border: none; border-radius: 8px;
+    padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+    display: flex; align-items: center; gap: 6px; transition: opacity 0.2s;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn:disabled { opacity: 0.45; cursor: default; }
+  .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+
+  /* ── TICKER STRIP ── */
+  .ticker-wrap { background: #070c17; border-bottom: 1px solid var(--border); overflow: hidden; height: 36px; }
+  .ticker-track { display: flex; gap: 0; animation: tickerScroll 40s linear infinite; width: max-content; }
+  .ticker-track:hover { animation-play-state: paused; }
+  @keyframes tickerScroll { from{transform:translateX(0);} to{transform:translateX(-50%);} }
+  .tick-item {
+    display: flex; align-items: center; gap: 8px; padding: 0 20px; height: 36px;
+    border-right: 1px solid #1a2235; white-space: nowrap; font-size: 13px;
+  }
+  .tick-name { color: var(--muted); font-weight: 500; }
+  .tick-price { color: var(--white); font-weight: 700; }
+  .tick-chg { font-weight: 600; font-size: 12px; }
+  .up { color: var(--green); }
+  .dn { color: var(--red); }
+  .neu { color: var(--muted); }
+
+  /* ── LAYOUT ── */
+  main { max-width: 1400px; margin: 0 auto; padding: 20px 20px 40px; }
+  .grid-top { display: grid; grid-template-columns: 1fr 220px 1fr; gap: 16px; margin-bottom: 16px; }
+  .grid-bot { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+  @media(max-width:1024px) { .grid-top{grid-template-columns:1fr 1fr;} .grid-bot{grid-template-columns:1fr;} }
+  @media(max-width:640px) { .grid-top{grid-template-columns:1fr;} }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 18px; overflow: hidden;
+  }
+  .card-title {
+    font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 14px; display: flex; align-items: center; gap: 6px;
+  }
+  .card-title .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+
+  /* ── FEAR & GREED ── */
+  .fg-center { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .fg-arc { position: relative; width: 140px; height: 80px; margin: 0 auto 8px; }
+  .fg-arc svg { width: 140px; height: 80px; }
+  .fg-score { font-size: 36px; font-weight: 900; color: var(--white); line-height: 1; }
+  .fg-label { font-size: 14px; font-weight: 700; }
+  .fg-vix { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  /* ── SECTORS ── */
+  .sector-row { display: flex; align-items: center; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #151f30; }
+  .sector-row:last-child { border-bottom: none; }
+  .sector-name { font-size: 13px; color: var(--text); }
+  .sector-bar-wrap { flex: 1; margin: 0 12px; height: 6px; background: #1a2235; border-radius: 3px; overflow: hidden; }
+  .sector-bar { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+  .sector-pct { font-size: 12px; font-weight: 700; min-width: 48px; text-align: right; }
+
+  /* ── INDICES ── */
+  .idx-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .idx-card {
+    background: var(--card2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .idx-name { font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  .idx-price { font-size: 18px; font-weight: 800; color: var(--white); margin: 4px 0 2px; }
+  .idx-chg { font-size: 12px; font-weight: 700; }
+
+  /* ── SIGNALS TABLE ── */
+  .signals-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .badge {
+    background: #172554; color: var(--accent); border-radius: 20px;
+    padding: 3px 10px; font-size: 11px; font-weight: 700;
+  }
+  .signal-scanning { text-align: center; padding: 40px; color: var(--muted); }
+  .scan-spinner { width: 36px; height: 36px; border: 3px solid #1e2d45; border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
+  @keyframes spin { to{transform:rotate(360deg);} }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    padding: 8px 10px; text-align: left; font-size: 10px; font-weight: 700;
+    letter-spacing: 0.8px; text-transform: uppercase; color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  tbody tr { border-bottom: 1px solid #0f1a2b; transition: background 0.15s; }
+  tbody tr:hover { background: #131d30; }
+  tbody tr:last-child { border-bottom: none; }
+  td { padding: 10px 10px; vertical-align: middle; }
+  .sym { font-weight: 800; color: var(--white); font-size: 13px; }
+  .sname { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .sec-badge {
+    display: inline-block; background: #0f1e35; color: #60a5fa;
+    border-radius: 4px; padding: 2px 7px; font-size: 10px; font-weight: 600;
+  }
+  .conf-bar-wrap { width: 80px; height: 6px; background: #1a2235; border-radius: 3px; overflow: hidden; display: inline-block; margin-left: 6px; vertical-align: middle; }
+  .conf-bar { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #3b82f6, #10b981); }
+  .conf-num { font-size: 12px; font-weight: 700; color: var(--green); }
+  .price-val { font-weight: 700; color: var(--white); }
+  .price-sub { font-size: 10px; color: var(--muted); }
+  .signal-tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: #052e16; color: var(--green); border-radius: 20px;
+    padding: 3px 10px; font-size: 11px; font-weight: 700;
+  }
+
+  /* ── NEWS ── */
+  .news-item { padding: 10px 0; border-bottom: 1px solid #0f1a2b; }
+  .news-item:last-child { border-bottom: none; }
+  .news-title { font-size: 13px; color: var(--text); line-height: 1.4; text-decoration: none; }
+  .news-title:hover { color: var(--accent); }
+  .news-meta { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .news-dot { color: #1e2d45; }
+
+  /* ── LOADING SKELETON ── */
+  .skel { background: linear-gradient(90deg,#111827 25%,#1a2235 50%,#111827 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 6px; }
+  @keyframes shimmer { 0%{background-position:200% 0;} 100%{background-position:-200% 0;} }
+
+  /* ── REASON PANEL ── */
+  .reason-row td { padding: 0 !important; }
+  .reason-panel {
+    display: none; padding: 14px 16px 16px;
+    background: #0c1422; border-top: 1px solid #1a2d45;
+    animation: fadeIn 0.2s ease;
+  }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(-4px);} to{opacity:1;transform:translateY(0);} }
+  .reason-panel.open { display: block; }
+  .reason-grid { display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: start; }
+  .reason-conditions { display: flex; flex-direction: column; gap: 6px; }
+  .reason-cond {
+    display: flex; align-items: flex-start; gap: 8px;
+    font-size: 12px; color: #94a3b8; line-height: 1.4;
+  }
+  .reason-cond .ck {
+    width: 16px; height: 16px; border-radius: 50%;
+    background: #052e16; border: 1.5px solid #10b981;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-top: 1px; font-size: 9px; color: #10b981;
+  }
+  .reason-cond .ck.fail {
+    background: #450a0a; border-color: #ef4444; color: #ef4444;
+  }
+  .scan-note {
+    font-size: 12px; color: #94a3b8; text-align: center; padding: 10px;
+    background: #111827; border-radius: 8px; margin-bottom: 10px;
+    border: 1px solid #1e2d45;
+  }
+  .reason-stats {
+    display: flex; flex-direction: column; gap: 6px;
+    min-width: 160px; background: #111827; border-radius: 8px;
+    padding: 10px 12px; border: 1px solid #1e2d45;
+  }
+  .reason-stat { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .reason-stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .reason-stat-val { font-size: 12px; font-weight: 700; color: var(--white); }
+  .entry-zone { font-size: 11px; color: var(--muted); margin-top: 8px; }
+  .why-btn {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: #0f1e35; color: #60a5fa; border: 1px solid #1e3a5f;
+    border-radius: 6px; padding: 3px 9px; font-size: 11px; font-weight: 600;
+    cursor: pointer; transition: background 0.15s; white-space: nowrap;
+  }
+  .why-btn:hover { background: #172554; }
+  .why-arrow { transition: transform 0.2s; display: inline-block; }
+  .why-btn.active .why-arrow { transform: rotate(180deg); }
+  tbody tr.sig-row { cursor: pointer; }
+  tbody tr.sig-row:hover { background: #131d30; }
+
+  /* ── EMPTY ── */
+  .empty { text-align: center; padding: 30px; color: var(--muted); font-size: 13px; }
+
+  /* ── SAVE TO HISTORY BUTTON ── */
+  .save-hist-btn {
+    background: transparent; border: 1px solid #334155; color: #64748b;
+    padding: 3px 9px; border-radius: 6px; font-size: 11px; font-weight: 600;
+    cursor: pointer; margin-left: 6px; transition: all 0.2s; white-space: nowrap;
+  }
+  .save-hist-btn:hover { background: #1e3a5f; border-color: #3b82f6; color: #60a5fa; }
+  .save-hist-btn.saved { background: #10b98120; border-color: #10b981; color: #10b981; cursor: default; }
+
+  /* ── HISTORY TABS ── */
+  .tab-bar { display:flex; gap:4px; margin-bottom:14px; }
+  .tab-btn {
+    padding:5px 14px; border-radius:8px; font-size:12px; font-weight:600;
+    border:1px solid var(--border); background:transparent; color:var(--muted);
+    cursor:pointer; transition:all 0.2s;
+  }
+  .tab-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .tab-btn:hover:not(.active) { color:var(--text); border-color:#334155; }
+
+  /* ── WIN RATE BAR ── */
+  .win-rate-bar {
+    background:var(--card2); border:1px solid var(--border); border-radius:10px;
+    padding:10px 16px; margin-bottom:12px;
+    display:flex; gap:20px; align-items:center; flex-wrap:wrap;
+  }
+  .wr-stat { display:flex; flex-direction:column; align-items:center; gap:1px; }
+  .wr-num  { font-weight:700; font-size:16px; }
+  .wr-lbl  { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; }
+  .wr-rate { margin-left:auto; font-weight:700; font-size:15px; }
+
+  /* ── HISTORY TABLE ── */
+  #historyPanel { display:none; }
+  .hist-table { width:100%; border-collapse:collapse; font-size:12px; }
+  .hist-table th {
+    text-align:left; padding:8px 10px; font-size:10px; font-weight:700;
+    color:var(--muted); text-transform:uppercase; letter-spacing:0.8px;
+    border-bottom:1px solid var(--border);
+  }
+  .hist-table td { padding:8px 10px; border-bottom:1px solid #0d1526; vertical-align:middle; }
+  .hist-table tr:hover td { background:var(--card2); }
+  .s-open { background:#10b98118; color:#10b981; border:1px solid #10b98140; padding:3px 8px; border-radius:20px; font-size:10px; font-weight:700; white-space:nowrap; }
+  .s-win  { background:#f59e0b18; color:#f59e0b; border:1px solid #f59e0b40; padding:3px 8px; border-radius:20px; font-size:10px; font-weight:700; white-space:nowrap; }
+  .s-loss { background:#ef444418; color:#ef4444; border:1px solid #ef444440; padding:3px 8px; border-radius:20px; font-size:10px; font-weight:700; white-space:nowrap; }
+  .mark-btn {
+    background:transparent; border:1px solid var(--border); color:var(--muted);
+    padding:3px 8px; border-radius:6px; font-size:10px; cursor:pointer;
+    transition:all 0.2s; margin-right:3px;
+  }
+  .mark-btn:hover { background:var(--card2); color:var(--text); }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: #1e3a5f; border: 1px solid #3b82f6; color: #e2e8f0;
+    padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 600;
+    z-index: 999; opacity: 0; transition: opacity 0.3s, transform 0.3s; pointer-events: none;
+    white-space: nowrap;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #toast.toast-ok  { border-color: #10b981; background: #064e3b; }
+  #toast.toast-err { border-color: #ef4444; background: #450a0a; }
+
+  /* ── CLEAR HISTORY BTN ── */
+  .clear-hist-btn {
+    margin-left: auto; background: transparent; border: 1px solid #334155;
+    color: #64748b; padding: 4px 12px; border-radius: 6px; font-size: 11px;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .clear-hist-btn:hover { border-color: #ef4444; color: #ef4444; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">K</div>
+    <div>
+      <div class="logo-text">AI Khan</div>
+      <div class="logo-sub">NSE · BSE Signal Engine</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div style="display:flex;align-items:center;gap:6px;"><div class="pulse"></div><span id="lastUpdate" style="font-size:12px;color:#64748b;">Connecting…</span></div>
+    <button class="btn" id="refreshBtn" onclick="triggerRefresh()">
+      <span>↺</span> Refresh Scan
+    </button>
+  </div>
+</header>
+
+<!-- TICKER STRIP -->
+<div class="ticker-wrap">
+  <div class="ticker-track" id="tickerTrack">
+    <div class="tick-item"><span class="tick-name">Loading…</span></div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<main>
+
+  <!-- ROW 1 -->
+  <div class="grid-top">
+
+    <!-- MARKET INDICES -->
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>Market Overview</div>
+      <div class="idx-grid" id="indicesGrid">
+        <div class="idx-card skel" style="height:70px;"></div>
+        <div class="idx-card skel" style="height:70px;"></div>
+        <div class="idx-card skel" style="height:70px;"></div>
+        <div class="idx-card skel" style="height:70px;"></div>
+      </div>
+    </div>
+
+    <!-- FEAR & GREED -->
+    <div class="card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;">
+      <div class="card-title" style="width:100%;justify-content:center;"><span class="dot" style="background:#f59e0b;"></span>Fear &amp; Greed</div>
+      <div class="fg-center" id="fgCenter">
+        <div class="skel" style="width:140px;height:80px;border-radius:10px;"></div>
+        <div class="skel" style="width:80px;height:36px;margin-top:8px;border-radius:8px;"></div>
+      </div>
+    </div>
+
+    <!-- SECTORS -->
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:#10b981;"></span>Sector Strength</div>
+      <div id="sectorList">
+        <div class="skel" style="height:14px;margin-bottom:12px;border-radius:4px;"></div>
+        <div class="skel" style="height:14px;margin-bottom:12px;border-radius:4px;"></div>
+        <div class="skel" style="height:14px;margin-bottom:12px;border-radius:4px;"></div>
+        <div class="skel" style="height:14px;border-radius:4px;"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ROW 2 -->
+  <div class="grid-bot">
+
+    <!-- SIGNALS -->
+    <div class="card">
+      <div class="signals-header">
+        <div class="card-title" style="margin-bottom:0;"><span class="dot" style="background:#10b981;"></span>Buy Signals <span id="sigCount" class="badge" style="margin-left:6px;">—</span></div>
+        <span id="scanTime" style="font-size:11px;color:#64748b;"></span>
+      </div>
+      <div class="tab-bar">
+        <button class="tab-btn active" id="tabLive" onclick="showTab('live')">Live Signals</button>
+        <button class="tab-btn" id="tabHistory" onclick="showTab('history')">📋 History</button>
+        <button class="tab-btn" id="tabAlerts" onclick="showTab('alerts')">🔔 Alerts</button>
+      </div>
+      <div id="signalsBody">
+        <div class="signal-scanning">
+          <div class="scan-spinner"></div>
+          <div style="font-weight:600;color:#e2e8f0;">Scanning market…</div>
+          <div style="font-size:12px;margin-top:4px;">This may take 30–60 seconds on first load</div>
+        </div>
+      </div>
+      <div id="historyPanel"></div>
+      <div id="alertsPanel" style="display:none;"></div>
+    </div>
+
+    <!-- NEWS -->
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:#8b5cf6;"></span>Market News</div>
+      <div id="newsList">
+        <div class="skel" style="height:50px;margin-bottom:10px;border-radius:6px;"></div>
+        <div class="skel" style="height:50px;margin-bottom:10px;border-radius:6px;"></div>
+        <div class="skel" style="height:50px;border-radius:6px;"></div>
+      </div>
+    </div>
+
+  </div>
+
+</main>
+
+<script>
+const BASE = '';
+
+// ── COLOUR HELPERS ──
+function chgColor(v){ return v > 0 ? 'up' : v < 0 ? 'dn' : 'neu'; }
+function chgSign(v){ return v > 0 ? '+' : ''; }
+function fgColor(score){
+  if(score>=75) return '#10b981';
+  if(score>=55) return '#84cc16';
+  if(score>=45) return '#f59e0b';
+  if(score>=25) return '#f97316';
+  return '#ef4444';
+}
+function sectorColor(v){ return v > 0 ? '#10b981' : v < 0 ? '#ef4444' : '#3b82f6'; }
+
+// ── TICKER BUILD ──
+function buildTicker(indices){
+  if(!indices||!indices.length) return;
+  const track = document.getElementById('tickerTrack');
+  const items = [...indices, ...indices].map(i=>`
+    <div class="tick-item">
+      <span class="tick-name">${i.name}</span>
+      <span class="tick-price">${i.price?.toLocaleString('en-IN')}</span>
+      <span class="tick-chg ${chgColor(i.change)}">${chgSign(i.change)}${i.change}%</span>
+    </div>`).join('');
+  track.innerHTML = items;
+}
+
+// ── INDICES ──
+function buildIndices(indices){
+  const g = document.getElementById('indicesGrid');
+  if(!indices||!indices.length){ g.innerHTML='<div class="empty">No data</div>'; return; }
+  g.innerHTML = indices.map(i=>`
+    <div class="idx-card">
+      <div class="idx-name">${i.name}</div>
+      <div class="idx-price">${i.price?.toLocaleString('en-IN')}</div>
+      <div class="idx-chg ${chgColor(i.change)}">${chgSign(i.change)}${i.change}%</div>
+    </div>`).join('');
+}
+
+// ── FEAR & GREED ──
+function buildFG(fg){
+  const el = document.getElementById('fgCenter');
+  const score = fg.score ?? 50;
+  const label = fg.label ?? 'Neutral';
+  const vix   = fg.vix ?? '—';
+  const color = fgColor(score);
+  // arc SVG (semicircle gauge)
+  const angle = (score/100)*180;
+  const rad   = (angle-90) * Math.PI/180;
+  const cx=70, cy=75, r=60;
+  const ex = cx + r*Math.cos(rad);
+  const ey = cy + r*Math.sin(rad);
+  const largeArc = angle > 90 ? 1 : 0;
+
+  el.innerHTML = `
+    <div class="fg-arc">
+      <svg viewBox="0 0 140 80" xmlns="http://www.w3.org/2000/svg">
+        <path d="M10,75 A60,60 0 0,1 130,75" fill="none" stroke="#1e2d45" stroke-width="10" stroke-linecap="round"/>
+        <path d="M10,75 A60,60 0 ${score>50?1:0},1 ${ex.toFixed(1)},${ey.toFixed(1)}" fill="none" stroke="${color}" stroke-width="10" stroke-linecap="round"/>
+        <circle cx="${ex.toFixed(1)}" cy="${ey.toFixed(1)}" r="5" fill="${color}"/>
+      </svg>
+    </div>
+    <div class="fg-score" style="color:${color}">${score}</div>
+    <div class="fg-label" style="color:${color}">${label}</div>
+    <div class="fg-vix">India VIX: ${vix}</div>`;
+}
+
+// ── SECTORS ──
+function buildSectors(sectors){
+  const el = document.getElementById('sectorList');
+  if(!sectors||!sectors.length){ el.innerHTML='<div class="empty">No data</div>'; return; }
+  const max = Math.max(...sectors.map(s=>Math.abs(s.change)),1);
+  el.innerHTML = sectors.map(s=>{
+    const pct = (Math.abs(s.change)/max*100).toFixed(0);
+    const c   = sectorColor(s.change);
+    return `<div class="sector-row">
+      <span class="sector-name">${s.name}</span>
+      <div class="sector-bar-wrap"><div class="sector-bar" style="width:${pct}%;background:${c};"></div></div>
+      <span class="sector-pct" style="color:${c}">${chgSign(s.change)}${s.change}%</span>
+    </div>`;
+  }).join('');
+}
+
+// ── TOGGLE REASON PANEL ──
+function toggleReason(id){
+  const panel = document.getElementById('reason-'+id);
+  const btn   = document.getElementById('why-'+id);
+  if(!panel) return;
+  const open = panel.classList.toggle('open');
+  btn.classList.toggle('active', open);
+  btn.querySelector('.why-arrow').textContent = open ? '▲' : '▼';
+}
+
+// ── SIGNALS TABLE ──
+function buildSignals(data){
+  const el    = document.getElementById('signalsBody');
+  const cnt   = document.getElementById('sigCount');
+  const st    = document.getElementById('scanTime');
+  const sigs  = data.signals || [];
+
+  if(data.status === 'scanning'){
+    const uCount = data.universe ? `${data.universe.toLocaleString()} stocks` : 'full market';
+    el.innerHTML = `<div class="signal-scanning"><div class="scan-spinner"></div><div style="font-weight:600;color:#e2e8f0;">Scanning universe…</div><div style="font-size:12px;margin-top:4px;">Checking ${uCount}, please wait</div></div>`;
+    cnt.textContent = '…';
+    return;
+  }
+
+  cnt.textContent = sigs.length;
+  if(data.scanTimeS) st.textContent = `Scanned in ${data.scanTimeS}s`;
+  // Store signals map for on-demand save
+  window._currentSignals = {};
+  sigs.forEach(s => { window._currentSignals[s.id] = s; });
+
+  if(!sigs.length){
+    const msg = data.note || 'No quality setups today. Market not giving clean entries.';
+    el.innerHTML = `<div class="empty">${msg}</div>`;
+    return;
+  }
+
+  const noteHTML = data.note ? `<div class="scan-note">${data.note}</div>` : '';
+
+  const rows = sigs.map(s => {
+    const id   = s.id;
+    const conds = (s.conditions || (s.reason ? [s.reason] : ['Multi-indicator confluence']));
+    const rsiColor = s.rsi < 40 ? 'var(--green)' : s.rsi > 65 ? 'var(--yellow)' : 'var(--white)';
+    const volColor = s.volumeRatio >= 2 ? 'var(--green)' : s.volumeRatio >= 1.5 ? 'var(--yellow)' : 'var(--muted)';
+
+    const condHTML = conds.map(c => {
+      const failed = c.trim().startsWith('✗');
+      const label = c.replace(/^[✓✗]\s*/, '');
+      return `
+      <div class="reason-cond">
+        <span class="ck${failed ? ' fail' : ''}">${failed ? '✗' : '✓'}</span>
+        <span>${label}</span>
+      </div>`;
+    }).join('');
+
+    const panelHTML = `
+      <tr class="reason-row">
+        <td colspan="8">
+          <div class="reason-panel" id="reason-${id}">
+            <div class="reason-grid">
+              <div>
+                <div style="font-size:11px;font-weight:700;color:#60a5fa;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:8px;">Why this signal?</div>
+                <div class="reason-conditions">${condHTML}</div>
+                <div class="entry-zone" style="margin-top:10px;">
+                  📌 Entry zone: <strong style="color:#e2e8f0;">${s.entry || '—'}</strong>
+                  &nbsp;·&nbsp; Hold: <strong style="color:#e2e8f0;">${s.days || '—'} days</strong>
+                </div>
+              </div>
+              <div class="reason-stats">
+                <div style="font-size:10px;font-weight:700;color:#60a5fa;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:4px;">Indicators</div>
+                <div class="reason-stat">
+                  <span class="reason-stat-label">RSI (14)</span>
+                  <span class="reason-stat-val" style="color:${rsiColor}">${s.rsi ?? '—'}</span>
+                </div>
+                <div class="reason-stat">
+                  <span class="reason-stat-label">Volume</span>
+                  <span class="reason-stat-val" style="color:${volColor}">${s.volumeRatio ? s.volumeRatio+'x' : '—'}</span>
+                </div>
+                <div class="reason-stat">
+                  <span class="reason-stat-label">ATR</span>
+                  <span class="reason-stat-val">₹${s.atr ?? '—'}</span>
+                </div>
+                <div class="reason-stat">
+                  <span class="reason-stat-label">Upside</span>
+                  <span class="reason-stat-val up">+${s.pctToTarget ?? '—'}%</span>
+                </div>
+                <div class="reason-stat">
+                  <span class="reason-stat-label">Downside</span>
+                  <span class="reason-stat-val dn">-${s.pctToSL ?? '—'}%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </td>
+      </tr>`;
+
+    const mainRow = `<tr class="sig-row" onclick="toggleReason(${id})">
+      <td><div class="sym">${s.symbol}</div><div class="sname">${s.name}</div></td>
+      <td><span class="sec-badge">${s.sector}</span></td>
+      <td>
+        <span class="conf-num">${s.confidence}%</span>
+        <span class="conf-bar-wrap"><span class="conf-bar" style="width:${s.confidence}%;"></span></span>
+      </td>
+      <td><div class="price-val">₹${Number(s.currentPrice).toLocaleString('en-IN',{maximumFractionDigits:2})}</div></td>
+      <td><div class="price-val up">₹${Number(s.targetFloat).toLocaleString('en-IN',{maximumFractionDigits:2})}</div><div class="price-sub">${s.rrRatio ? s.rrRatio+'x R:R' : ''}</div></td>
+      <td><div class="price-val dn">₹${Number(s.stopFloat).toLocaleString('en-IN',{maximumFractionDigits:2})}</div></td>
+      <td>
+        <span class="signal-tag">▲ BUY</span>
+        <button class="why-btn" id="why-${id}" onclick="event.stopPropagation();toggleReason(${id})" style="margin-left:6px;">
+          Why? <span class="why-arrow">▼</span>
+        </button>
+        <button class="save-hist-btn" id="savebtn-${id}" onclick="event.stopPropagation();saveSignalToHistory(${id})">＋ Save</button>
+      </td>
+    </tr>${panelHTML}`;
+
+    return mainRow;
+  }).join('');
+
+  el.innerHTML = `${noteHTML}<div style="overflow-x:auto;">
+  <table>
+    <thead><tr>
+      <th>Symbol</th><th>Sector</th><th>Confidence</th>
+      <th>Price</th><th>Target</th><th>Stop Loss</th><th>Signal / Save</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>`;
+
+  // Restore "Saved" button state for signals already saved today
+  const _hist = loadHistory();
+  const _today = new Date().toDateString();
+  const _savedToday = new Set(_hist.filter(h => new Date(h.generatedAt||0).toDateString()===_today).map(h=>h.symbol));
+  sigs.forEach(s => {
+    if(_savedToday.has(s.symbol)){
+      const btn = document.getElementById('savebtn-'+s.id);
+      if(btn){ btn.textContent='✓ Saved'; btn.classList.add('saved'); btn.disabled=true; }
+    }
+  });
+  // Update history tab badge
+  const _tabBtn = document.getElementById('tabHistory');
+  if(_tabBtn && _hist.length) _tabBtn.textContent = `📋 History (${_hist.length})`;
+}
+
+// ── NEWS ──
+function buildNews(news){
+  const el = document.getElementById('newsList');
+  if(!news||!news.length){ el.innerHTML='<div class="empty">No news available</div>'; return; }
+  el.innerHTML = news.map(n=>`
+    <div class="news-item">
+      <a class="news-title" href="${n.link}" target="_blank" rel="noopener">${n.title}</a>
+      <div class="news-meta">${n.publisher}</div>
+    </div>`).join('');
+}
+
+// ── LAST UPDATE ──
+function setUpdate(text){ document.getElementById('lastUpdate').textContent = text; }
+
+// ── SCANNING TIMER ──
+let _scanTimer = null;
+function startScanTimer(){
+  let secs = 0;
+  const el = document.getElementById('signalsBody');
+  clearInterval(_scanTimer);
+  _scanTimer = setInterval(()=>{
+    secs++;
+    const mins = Math.floor(secs/60);
+    const s    = secs % 60;
+    const t    = mins > 0 ? `${mins}m ${s}s` : `${s}s`;
+    const pct  = Math.min(95, Math.round(secs/160*100));
+    if(el) el.innerHTML = `
+      <div class="signal-scanning">
+        <div class="scan-spinner"></div>
+        <div style="font-weight:700;color:#e2e8f0;font-size:15px;">Scanning ${window._universeCount ? window._universeCount.toLocaleString()+' stocks' : 'full market'}…</div>
+        <div style="font-size:12px;margin-top:6px;color:#64748b;">Usually takes 2–3 minutes · ${t} elapsed</div>
+        <div style="margin:12px auto 0;width:220px;height:6px;background:#1a2235;border-radius:3px;overflow:hidden;">
+          <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#3b82f6,#10b981);border-radius:3px;transition:width 1s linear;"></div>
+        </div>
+      </div>`;
+  }, 1000);
+}
+function stopScanTimer(){ clearInterval(_scanTimer); _scanTimer = null; }
+
+// ── SIGNAL HISTORY ──
+const HISTORY_KEY = 'signal_history';
+const MAX_HISTORY = 50;
+
+function loadHistory(){
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); }
+  catch(e){ return []; }
+}
+
+function saveToHistory(signals){
+  if(!signals || !signals.length) return;
+  let hist = loadHistory();
+  const today = new Date().toDateString();
+  // Symbols already saved today — don't duplicate
+  const savedToday = new Set(
+    hist.filter(h => new Date(h.generatedAt||0).toDateString() === today).map(h => h.symbol)
+  );
+  const newEntries = signals
+    .filter(s => !savedToday.has(s.symbol))
+    .map(s => ({
+      id:          s.id,
+      symbol:      s.symbol,
+      name:        s.name,
+      entry:       s.entry,
+      target:      s.target,
+      targetFloat: s.targetFloat,
+      stoploss:    s.stoploss,
+      stopFloat:   s.stopFloat,
+      confidence:  s.confidence,
+      rrRatio:     s.rrRatio,
+      sector:      s.sector,
+      generatedAt: s.generatedAt || new Date().toISOString(),
+      status:      'OPEN',
+    }));
+  if(!newEntries.length) return;
+  hist = [...newEntries, ...hist].slice(0, MAX_HISTORY);
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(hist));
+  // Update badge on tab if history tab is not active
+  const btn = document.getElementById('tabHistory');
+  if(btn) btn.textContent = `📋 History (${hist.length})`;
+}
+
+let _toastTimer = null;
+function showToast(msg, type='ok'){
+  const t = document.getElementById('toast');
+  if(!t) return;
+  clearTimeout(_toastTimer);
+  t.textContent = msg;
+  t.className = `show toast-${type}`;
+  _toastTimer = setTimeout(() => { t.className = ''; }, 3000);
+}
+
+function saveSignalToHistory(id){
+  const s = (window._currentSignals || {})[id];
+  if(!s){
+    showToast('⚠ Could not save — please wait for signals to finish loading', 'err');
+    return;
+  }
+  let hist = loadHistory();
+  const today = new Date().toDateString();
+  const alreadySaved = hist.some(h =>
+    h.symbol === s.symbol && new Date(h.generatedAt||0).toDateString() === today
+  );
+  if(!alreadySaved){
+    const entry = {
+      id:          s.id,
+      symbol:      s.symbol,
+      name:        s.name,
+      entry:       s.entry,
+      target:      s.target,
+      targetFloat: s.targetFloat,
+      stoploss:    s.stoploss,
+      stopFloat:   s.stopFloat,
+      confidence:  s.confidence,
+      rrRatio:     s.rrRatio,
+      sector:      s.sector,
+      generatedAt: s.generatedAt || new Date().toISOString(),
+      status:      'OPEN',
+    };
+    hist = [entry, ...hist].slice(0, MAX_HISTORY);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(hist));
+    showToast(`✓ ${s.symbol} saved to History`, 'ok');
+  } else {
+    showToast(`${s.symbol} already saved today`, 'ok');
+  }
+  const btn = document.getElementById('savebtn-' + id);
+  if(btn){ btn.textContent = '✓ Saved'; btn.classList.add('saved'); btn.disabled = true; }
+  const tabBtn = document.getElementById('tabHistory');
+  if(tabBtn){ const h = loadHistory(); tabBtn.textContent = `📋 History (${h.length})`; }
+}
+
+function clearHistory(){
+  if(!confirm('Clear all signal history? This cannot be undone.')) return;
+  localStorage.removeItem(HISTORY_KEY);
+  const tabBtn = document.getElementById('tabHistory');
+  if(tabBtn) tabBtn.textContent = '📋 History';
+  renderHistory();
+  showToast('History cleared', 'ok');
+}
+
+function markSignal(id, status){
+  let hist = loadHistory();
+  hist = hist.map(h => h.id === id ? {...h, status} : h);
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(hist));
+  renderHistory();
+}
+
+function renderHistory(){
+  const panel = document.getElementById('historyPanel');
+  const hist  = loadHistory();
+
+  if(!hist.length){
+    panel.innerHTML = '<div class="empty">No saved signals yet.<br>Tap <strong style="color:#10b981;">＋ Save</strong> on any signal in the Live Signals tab to track it here.</div>';
+    return;
+  }
+
+  const wins    = hist.filter(h => h.status === 'HIT_TARGET').length;
+  const losses  = hist.filter(h => h.status === 'STOPPED_OUT').length;
+  const open    = hist.filter(h => h.status === 'OPEN').length;
+  const decided = wins + losses;
+  const wr      = decided > 0 ? Math.round(wins / decided * 100) : null;
+  const wrColor = wr === null ? 'var(--muted)' : wr >= 60 ? '#10b981' : wr >= 40 ? '#f59e0b' : '#ef4444';
+  const wrText  = wr !== null ? `Win Rate: ${wr}%` : `Win Rate: N/A`;
+  const summary = `${hist.length} signals · ${wins} wins · ${losses} SL · ${open} open · ${wrText}`;
+
+  const statsBar = `
+    <div class="win-rate-bar">
+      <div class="wr-stat"><span class="wr-num" style="color:#10b981">${wins}</span><span class="wr-lbl">Wins</span></div>
+      <div class="wr-stat"><span class="wr-num" style="color:#ef4444">${losses}</span><span class="wr-lbl">SL Hit</span></div>
+      <div class="wr-stat"><span class="wr-num" style="color:#64748b">${open}</span><span class="wr-lbl">Open</span></div>
+      <div class="wr-stat"><span class="wr-num" style="color:#e2e8f0">${hist.length}</span><span class="wr-lbl">Total</span></div>
+      <div class="wr-rate" style="color:${wrColor}">${wrText}</div>
+      <button class="clear-hist-btn" onclick="clearHistory()">🗑 Clear All</button>
+    </div>
+    <div style="font-size:11px;color:#64748b;margin-bottom:10px;">${summary}</div>`;
+
+  const rows = hist.map(h => {
+    const date  = new Date(h.generatedAt||Date.now()).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'});
+    const cls   = h.status==='HIT_TARGET' ? 's-win' : h.status==='STOPPED_OUT' ? 's-loss' : 's-open';
+    const label = h.status==='HIT_TARGET' ? '✓ HIT TARGET' : h.status==='STOPPED_OUT' ? '✗ STOPPED OUT' : '● OPEN';
+    const btns  = h.status === 'OPEN'
+      ? `<button class="mark-btn" onclick="markSignal(${h.id},'HIT_TARGET')">✓ Target</button>
+         <button class="mark-btn" onclick="markSignal(${h.id},'STOPPED_OUT')">✗ SL</button>`
+      : `<button class="mark-btn" onclick="markSignal(${h.id},'OPEN')">↩ Reset</button>`;
+    return `<tr>
+      <td><div class="sym" style="font-size:12px">${h.symbol}</div><div class="sname">${h.name}</div></td>
+      <td style="color:#e2e8f0">${h.entry||'—'}</td>
+      <td class="up">${h.target||'—'}</td>
+      <td class="dn">${h.stoploss||'—'}</td>
+      <td style="color:var(--muted)">${date}</td>
+      <td><span class="${cls}">${label}</span></td>
+      <td>${btns}</td>
+    </tr>`;
+  }).join('');
+
+  panel.innerHTML = `${statsBar}
+    <div style="overflow-x:auto;">
+      <table class="hist-table">
+        <thead><tr>
+          <th>Symbol</th><th>Entry</th><th>Target</th><th>SL</th><th>Date</th><th>Status</th><th>Mark as</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+function showTab(tab){
+  const live      = document.getElementById('signalsBody');
+  const hist      = document.getElementById('historyPanel');
+  const alertsP   = document.getElementById('alertsPanel');
+  const tabLive   = document.getElementById('tabLive');
+  const tabHist   = document.getElementById('tabHistory');
+  const tabAlerts = document.getElementById('tabAlerts');
+
+  live.style.display    = 'none';
+  hist.style.display    = 'none';
+  alertsP.style.display = 'none';
+  tabLive.classList.remove('active');
+  tabHist.classList.remove('active');
+  tabAlerts.classList.remove('active');
+
+  if(tab === 'live'){
+    live.style.display = 'block';
+    tabLive.classList.add('active');
+  } else if(tab === 'history'){
+    hist.style.display = 'block';
+    tabHist.classList.add('active');
+    renderHistory();
+  } else if(tab === 'alerts'){
+    alertsP.style.display = 'block';
+    tabAlerts.classList.add('active');
+    renderAlerts();
+  }
+}
+
+// ── ALERTS PANEL ──
+async function renderAlerts(){
+  const el = document.getElementById('alertsPanel');
+  el.innerHTML = '<div style="padding:20px;color:#64748b;text-align:center;">Loading alert status…</div>';
+  try {
+    const res  = await fetch(`${BASE}/api/scheduler/status`);
+    const data = await res.json();
+
+    const tgOk = data.telegramConfigured;
+    const emOk = data.emailConfigured;
+
+    const fmtTime = iso => {
+      if(!iso) return '—';
+      const d = new Date(iso);
+      return d.toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+    };
+
+    el.innerHTML = `
+    <div style="padding:4px 0 16px;">
+
+      <!-- Scheduler Status -->
+      <div style="background:#0c1422;border:1px solid #1e2d45;border-radius:10px;padding:16px;margin-bottom:14px;">
+        <div style="font-size:11px;font-weight:700;color:#60a5fa;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:12px;">⏱ Auto-Scan Scheduler</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px;">
+          <div><span style="color:#64748b;">Status</span><br><span style="color:#10b981;font-weight:700;">${data.running ? '● Running' : '○ Stopped'}</span></div>
+          <div><span style="color:#64748b;">Scans run</span><br><span style="font-weight:700;">${data.scanCount || 0}</span></div>
+          <div><span style="color:#64748b;">Last scan</span><br><span style="font-weight:600;">${fmtTime(data.lastScanAt)}</span></div>
+          <div><span style="color:#64748b;">Next scan</span><br><span style="font-weight:600;">${fmtTime(data.nextScanAt)}</span></div>
+        </div>
+        <div style="margin-top:10px;font-size:11px;color:#475569;border-top:1px solid #1e2d45;padding-top:10px;">
+          Market hours (9am–4pm IST): every 30 min &nbsp;·&nbsp; Pre/post: 60 min &nbsp;·&nbsp; Overnight: 2 hours
+        </div>
+      </div>
+
+      <!-- Last Alert -->
+      <div style="background:#0c1422;border:1px solid #1e2d45;border-radius:10px;padding:16px;margin-bottom:14px;">
+        <div style="font-size:11px;font-weight:700;color:#60a5fa;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:12px;">📣 Last Alert Sent</div>
+        ${data.lastAlertAt ? `
+          <div style="font-size:13px;color:#e2e8f0;margin-bottom:8px;">${fmtTime(data.lastAlertAt)}</div>
+          <div style="display:flex;gap:10px;font-size:12px;">
+            <span style="color:${data.lastAlertStatus?.telegram ? '#10b981' : '#ef4444'};">
+              ${data.lastAlertStatus?.telegram ? '✓' : '✗'} Telegram
+            </span>
+            <span style="color:${data.lastAlertStatus?.email ? '#10b981' : '#ef4444'};">
+              ${data.lastAlertStatus?.email ? '✓' : '✗'} Email
+            </span>
+          </div>` : '<div style="font-size:13px;color:#64748b;">No alerts sent yet</div>'}
+      </div>
+
+      <!-- Telegram Config -->
+      <div style="background:#0c1422;border:1px solid ${tgOk ? '#10b981' : '#374151'};border-radius:10px;padding:16px;margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <div style="font-size:11px;font-weight:700;color:#60a5fa;letter-spacing:0.8px;text-transform:uppercase;">📱 Telegram</div>
+          <span style="font-size:11px;padding:2px 10px;border-radius:20px;font-weight:700;
+            background:${tgOk ? '#052e16' : '#1c0a00'};
+            color:${tgOk ? '#10b981' : '#f97316'};
+            border:1px solid ${tgOk ? '#10b981' : '#f97316'};">
+            ${tgOk ? '✓ Configured' : '⚠ Not set'}
+          </span>
+        </div>
+        ${tgOk ? `
+          <div style="font-size:12px;color:#64748b;margin-bottom:10px;">Chat ID: <span style="color:#94a3b8;">${data.telegramChatId}</span></div>
+          <button onclick="testTelegram(this)" style="background:#1e3a5f;color:#60a5fa;border:1px solid #1e40af;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;">
+            Send Test Message
+          </button>` : `
+          <div style="font-size:12px;color:#64748b;">Add TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in Secrets to enable Telegram alerts.</div>`}
+      </div>
+
+      <!-- Email Config -->
+      <div style="background:#0c1422;border:1px solid ${emOk ? '#10b981' : '#374151'};border-radius:10px;padding:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <div style="font-size:11px;font-weight:700;color:#60a5fa;letter-spacing:0.8px;text-transform:uppercase;">📧 Email</div>
+          <span style="font-size:11px;padding:2px 10px;border-radius:20px;font-weight:700;
+            background:${emOk ? '#052e16' : '#1c0a00'};
+            color:${emOk ? '#10b981' : '#f97316'};
+            border:1px solid ${emOk ? '#10b981' : '#f97316'};">
+            ${emOk ? '✓ Configured' : '⚠ Not set'}
+          </span>
+        </div>
+        ${emOk ? `
+          <div style="font-size:12px;color:#64748b;margin-bottom:6px;">Recipient: <span style="color:#94a3b8;">${data.emailRecipient}</span></div>
+          <div style="font-size:11px;color:#475569;margin-bottom:10px;padding:8px;background:#0a0f1a;border-radius:6px;border:1px solid #1e2d45;">
+            ⚠️ <strong style="color:#f59e0b;">Gmail requires an App Password</strong> — not your regular password.<br>
+            Go to <span style="color:#60a5fa;">myaccount.google.com → Security → 2-Step Verification → App passwords</span> and generate one, then update <code style="color:#94a3b8;">EMAIL_PASSWORD</code> in Secrets.
+          </div>
+          <button onclick="testEmail(this)" style="background:#1e3a5f;color:#60a5fa;border:1px solid #1e40af;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;">
+            Send Test Email
+          </button>` : `
+          <div style="font-size:12px;color:#64748b;">Add EMAIL_SENDER, EMAIL_PASSWORD, and EMAIL_RECIPIENT in Secrets to enable email alerts.</div>`}
+      </div>
+
+    </div>`;
+  } catch(e){
+    el.innerHTML = '<div class="empty">Could not load alert status.</div>';
+  }
+}
+
+async function testTelegram(btn){
+  btn.disabled = true; btn.textContent = 'Sending…';
+  try {
+    const res  = await fetch(`${BASE}/api/alerts/test/telegram`, {method:'POST'});
+    const data = await res.json();
+    if(data.ok){ showToast('✓ Telegram test message sent!', 'ok'); btn.textContent = '✓ Sent!'; }
+    else        { showToast('✗ Telegram failed: ' + (data.error||'unknown'), 'err'); btn.textContent = 'Retry'; btn.disabled = false; }
+  } catch(e){ showToast('✗ Request failed', 'err'); btn.textContent = 'Retry'; btn.disabled = false; }
+}
+
+async function testEmail(btn){
+  btn.disabled = true; btn.textContent = 'Sending…';
+  try {
+    const res  = await fetch(`${BASE}/api/alerts/test/email`, {method:'POST'});
+    const data = await res.json();
+    if(data.ok){ showToast('✓ Test email sent! Check your inbox.', 'ok'); btn.textContent = '✓ Sent!'; }
+    else        { showToast('✗ Email failed: ' + (data.error||'unknown'), 'err'); btn.textContent = 'Retry'; btn.disabled = false; }
+  } catch(e){ showToast('✗ Request failed', 'err'); btn.textContent = 'Retry'; btn.disabled = false; }
+}
+
+// ── FETCH ALL ──
+async function fetchAll(){
+  try {
+    const [overRes, intelRes, newsRes, sigRes] = await Promise.all([
+      fetch(`${BASE}/api/overview`),
+      fetch(`${BASE}/api/market-intel`),
+      fetch(`${BASE}/api/news`),
+      fetch(`${BASE}/api/signals`),
+    ]);
+    const [ov, intel, newsData, sigData] = await Promise.all([
+      overRes.json(), intelRes.json(), newsRes.json(), sigRes.json()
+    ]);
+
+    buildTicker(ov.indices);
+    buildIndices(ov.indices);
+    buildFG(intel.fearGreed || {});
+    buildSectors(intel.sectors || []);
+    buildNews(newsData.news || []);
+    buildSignals(sigData);
+
+    const now = new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+    setUpdate(`Updated ${now}`);
+
+    // If scan is still running on page load, auto-poll until done
+    if(sigData.status === 'scanning'){
+      startScanTimer();
+      pollSignals();
+    }
+  } catch(e){
+    setUpdate('Error loading data');
+    console.error(e);
+  }
+}
+
+// ── REFRESH SCAN ──
+async function triggerRefresh(){
+  const btn = document.getElementById('refreshBtn');
+  btn.disabled = true; btn.innerHTML = '↺ Scanning…';
+  document.getElementById('sigCount').textContent = '…';
+  startScanTimer();
+  try { await fetch(`${BASE}/api/signals/refresh`); } catch(e){}
+  await pollSignals();
+  btn.disabled = false; btn.innerHTML = '<span>↺</span> Refresh Scan';
+}
+
+// ── POLL UNTIL SCAN COMPLETE ──
+async function pollSignals(maxTries=120){
+  for(let i=0;i<maxTries;i++){
+    await new Promise(r=>setTimeout(r,3000));
+    try {
+      const res  = await fetch(`${BASE}/api/signals`);
+      const data = await res.json();
+      if(data.universe) window._universeCount = data.universe;
+      if(data.status === 'ok'){
+        stopScanTimer();
+        buildSignals(data);
+        const now = new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+        setUpdate(`Updated ${now} · ${(data.universe||'').toLocaleString()} stocks scanned`);
+        document.querySelector('.pulse').style.background = '#10b981';
+        return;
+      }
+    } catch(e){ break; }
+  }
+  // Timed out — stop spinner and show a message
+  stopScanTimer();
+  const el = document.getElementById('signalsBody');
+  if(el) el.innerHTML = '<div class="empty">Scan is taking longer than expected. Please try Refresh Scan again.</div>';
+  const btn = document.getElementById('refreshBtn');
+  if(btn){ btn.disabled = false; btn.innerHTML = '<span>↺</span> Refresh Scan'; }
+}
+
+// ── INIT ──
+fetchAll();
+// Auto-refresh overview + intel every 5 min
+setInterval(async()=>{
+  try {
+    const [overRes, intelRes, newsRes] = await Promise.all([
+      fetch(`${BASE}/api/overview`),
+      fetch(`${BASE}/api/market-intel`),
+      fetch(`${BASE}/api/news`),
+    ]);
+    const [ov, intel, newsData] = await Promise.all([overRes.json(), intelRes.json(), newsRes.json()]);
+    buildTicker(ov.indices);
+    buildIndices(ov.indices);
+    buildFG(intel.fearGreed||{});
+    buildSectors(intel.sectors||[]);
+    buildNews(newsData.news||[]);
+    const now = new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+    setUpdate(`Updated ${now}`);
+  } catch(e){}
+}, 300000);
+</script>
+<div id="toast"></div>
+</body>
+</html>
